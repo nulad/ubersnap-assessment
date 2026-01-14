@@ -159,8 +159,9 @@ func TestDoubleDipConcurrency(t *testing.T) {
 	}
 	_ = conn.Close()
 
-	// Setup: Create coupon with amount=100
-	createCoupon(t, "DOUBLE_DIP", 100)
+	// Setup: Create coupon with amount=100 with unique name to avoid conflicts
+	couponName := fmt.Sprintf("DOUBLE_DIP_%d", time.Now().UnixNano())
+	createCoupon(t, couponName, 100)
 
 	// Execute: Spawn 10 goroutines, ALL using SAME user_id
 	var wg sync.WaitGroup
@@ -172,7 +173,7 @@ func TestDoubleDipConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// All goroutines use the SAME user_id
-			resp := claimCoupon(userId, "DOUBLE_DIP")
+			resp := claimCoupon(userId, couponName)
 			results <- resp.StatusCode
 		}()
 	}
@@ -202,7 +203,7 @@ func TestDoubleDipConcurrency(t *testing.T) {
 	assert.Equal(t, 0, otherErrors, "Expected no other errors")
 
 	// Verify database state
-	coupon := getCoupon(t, "DOUBLE_DIP")
+	coupon := getCoupon(t, couponName)
 	assert.Equal(t, 99, coupon.RemainingAmount, "Expected remaining amount to be 99 after 1 claim")
 	assert.Equal(t, 1, len(coupon.ClaimedBy), "Expected exactly 1 user in claimed_by list")
 	assert.Contains(t, coupon.ClaimedBy, userId, "Expected the double dip user to be in claimed_by list")
