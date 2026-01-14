@@ -5,237 +5,276 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/nulad/ubersnap-assessment/internal/database"
 	"github.com/nulad/ubersnap-assessment/internal/repository"
 )
 
-// Mock implementations for testing
-
-type mockCouponRepository struct {
-	createFunc             func(name string, amount int) error
-	getByNameFunc          func(name string) (*repository.Coupon, error)
-	getByNameForUpdateFunc func(tx *sql.Tx, name string) (*repository.Coupon, error)
-	decrementStockFunc     func(tx *sql.Tx, name string) error
+// MockCouponRepository is a mock implementation of CouponRepository
+type MockCouponRepository struct {
+	mock.Mock
 }
 
-func (m *mockCouponRepository) Create(name string, amount int) error {
-	if m.createFunc != nil {
-		return m.createFunc(name, amount)
+func (m *MockCouponRepository) Create(name string, amount int) error {
+	args := m.Called(name, amount)
+	return args.Error(0)
+}
+
+func (m *MockCouponRepository) GetByName(name string) (*repository.Coupon, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return nil
+	return args.Get(0).(*repository.Coupon), args.Error(1)
 }
 
-func (m *mockCouponRepository) GetByName(name string) (*repository.Coupon, error) {
-	if m.getByNameFunc != nil {
-		return m.getByNameFunc(name)
+func (m *MockCouponRepository) GetByNameForUpdate(tx *sql.Tx, name string) (*repository.Coupon, error) {
+	args := m.Called(tx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return &repository.Coupon{Name: name, Amount: 10, RemainingAmount: 5}, nil
+	return args.Get(0).(*repository.Coupon), args.Error(1)
 }
 
-func (m *mockCouponRepository) GetByNameForUpdate(tx *sql.Tx, name string) (*repository.Coupon, error) {
-	if m.getByNameForUpdateFunc != nil {
-		return m.getByNameForUpdateFunc(tx, name)
-	}
-	return &repository.Coupon{Name: name, Amount: 10, RemainingAmount: 5}, nil
+func (m *MockCouponRepository) DecrementStock(tx *sql.Tx, name string) error {
+	args := m.Called(tx, name)
+	return args.Error(0)
 }
 
-func (m *mockCouponRepository) DecrementStock(tx *sql.Tx, name string) error {
-	if m.decrementStockFunc != nil {
-		return m.decrementStockFunc(tx, name)
-	}
-	return nil
+// MockClaimRepository is a mock implementation of ClaimRepository
+type MockClaimRepository struct {
+	mock.Mock
 }
 
-type mockClaimRepository struct {
-	insertFunc           func(tx *sql.Tx, userID, couponName string) error
-	getByCouponNameFunc  func(couponName string) ([]database.Claim, error)
+func (m *MockClaimRepository) Insert(tx *sql.Tx, userID, couponName string) error {
+	args := m.Called(tx, userID, couponName)
+	return args.Error(0)
 }
 
-func (m *mockClaimRepository) Insert(tx *sql.Tx, userID, couponName string) error {
-	if m.insertFunc != nil {
-		return m.insertFunc(tx, userID, couponName)
-	}
-	return nil
+func (m *MockClaimRepository) GetByCouponName(couponName string) ([]database.Claim, error) {
+	args := m.Called(couponName)
+	return args.Get(0).([]database.Claim), args.Error(1)
 }
 
-func (m *mockClaimRepository) GetByCouponName(couponName string) ([]database.Claim, error) {
-	if m.getByCouponNameFunc != nil {
-		return m.getByCouponNameFunc(couponName)
-	}
-	return []database.Claim{}, nil
-}
-
-// Helper function to create a mock DB for testing
-// Note: In real tests with transactions, you'd use a test database
-func createMockDB(t *testing.T) *sql.DB {
-	// For unit tests, we'll use nil and mock the transaction behavior
-	// Integration tests should use a real test database
-	return nil
-}
-
-func TestCreateCoupon_Success(t *testing.T) {
-	mockRepo := &mockCouponRepository{
-		createFunc: func(name string, amount int) error {
-			return nil
-		},
-	}
+func TestCouponService_CreateCoupon(t *testing.T) {
+	mockCouponRepo := new(MockCouponRepository)
+	mockClaimRepo := new(MockClaimRepository)
 	
-	service := NewCouponService(nil, mockRepo, nil)
-	
-	err := service.CreateCoupon("SUMMER2024", 100)
+	// Create a mock database connection
+	db, _, err := sqlmock.New()
 	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+		t.Fatalf("failed to create mock database: %v", err)
 	}
+	defer db.Close()
+
+	service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
+	t.Run("successful coupon creation", func(t *testing.T) {
+		mockCouponRepo.On("Create", "TEST10", 10).Return(nil)
+
+		err := service.CreateCoupon("TEST10", 10)
+
+		assert.NoError(t, err)
+		mockCouponRepo.AssertExpectations(t)
+	})
+
+	t.Run("invalid amount", func(t *testing.T) {
+		err := service.CreateCoupon("INVALID", 0)
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, repository.ErrInvalidAmount))
+	})
+
+	t.Run("negative amount", func(t *testing.T) {
+		err := service.CreateCoupon("NEGATIVE", -5)
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, repository.ErrInvalidAmount))
+	})
+
+	t.Run("coupon already exists", func(t *testing.T) {
+		mockCouponRepo.On("Create", "DUPLICATE", 10).Return(repository.ErrCouponExists)
+
+		err := service.CreateCoupon("DUPLICATE", 10)
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, repository.ErrCouponExists))
+		mockCouponRepo.AssertExpectations(t)
+	})
 }
 
-func TestCreateCoupon_InvalidAmount(t *testing.T) {
-	mockRepo := &mockCouponRepository{}
-	service := NewCouponService(nil, mockRepo, nil)
+func TestCouponService_ClaimCoupon(t *testing.T) {
+	mockCouponRepo := new(MockCouponRepository)
+	mockClaimRepo := new(MockClaimRepository)
 	
-	err := service.CreateCoupon("INVALID", -1)
-	if !errors.Is(err, ErrInvalidAmount) {
-		t.Errorf("Expected ErrInvalidAmount, got %v", err)
-	}
-}
-
-func TestCreateCoupon_AlreadyExists(t *testing.T) {
-	mockRepo := &mockCouponRepository{
-		createFunc: func(name string, amount int) error {
-			return repository.ErrCouponExists
-		},
-	}
-	
-	service := NewCouponService(nil, mockRepo, nil)
-	
-	err := service.CreateCoupon("DUPLICATE", 100)
-	if !errors.Is(err, ErrCouponExists) {
-		t.Errorf("Expected ErrCouponExists, got %v", err)
-	}
-}
-
-func TestGetCouponDetails_Success(t *testing.T) {
-	mockCouponRepo := &mockCouponRepository{
-		getByNameFunc: func(name string) (*repository.Coupon, error) {
-			return &repository.Coupon{
-				Name:            "TEST",
-				Amount:          100,
-				RemainingAmount: 50,
-			}, nil
-		},
-	}
-	
-	mockClaimRepo := &mockClaimRepository{
-		getByCouponNameFunc: func(couponName string) ([]database.Claim, error) {
-			return []database.Claim{
-				{UserID: "user1", CouponName: "TEST", ClaimedAt: "2024-01-01"},
-				{UserID: "user2", CouponName: "TEST", ClaimedAt: "2024-01-02"},
-			}, nil
-		},
-	}
-	
-	service := NewCouponService(nil, mockCouponRepo, mockClaimRepo)
-	
-	details, err := service.GetCouponDetails("TEST")
+	// Create a mock database connection
+	db, sqlMock, err := sqlmock.New()
 	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+		t.Fatalf("failed to create mock database: %v", err)
 	}
-	
-	if details.Name != "TEST" {
-		t.Errorf("Expected name TEST, got %s", details.Name)
-	}
-	
-	if details.Amount != 100 {
-		t.Errorf("Expected amount 100, got %d", details.Amount)
-	}
-	
-	if details.RemainingAmount != 50 {
-		t.Errorf("Expected remaining amount 50, got %d", details.RemainingAmount)
-	}
-	
-	if len(details.Claims) != 2 {
-		t.Errorf("Expected 2 claims, got %d", len(details.Claims))
-	}
+	defer db.Close()
+
+	service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
+	t.Run("successful claim", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "TEST10",
+			Amount:         10,
+			RemainingAmount: 10,
+		}
+
+		// Mock transaction begin
+		sqlMock.ExpectBegin()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "TEST10").Return(coupon, nil)
+		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "TEST10").Return(nil)
+		mockCouponRepo.On("DecrementStock", mock.AnythingOfType("*sql.Tx"), "TEST10").Return(nil)
+		
+		// Mock transaction commit
+		sqlMock.ExpectCommit()
+
+		err := service.ClaimCoupon("user123", "TEST10")
+
+		assert.NoError(t, err)
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("coupon not found", func(t *testing.T) {
+		// Mock transaction begin and rollback
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "NOTFOUND").Return(nil, repository.ErrCouponNotFound)
+
+		err := service.ClaimCoupon("user123", "NOTFOUND")
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrCouponNotFound))
+		mockCouponRepo.AssertExpectations(t)
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("no stock available", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "EMPTY",
+			Amount:         10,
+			RemainingAmount: 0,
+		}
+
+		// Mock transaction begin and rollback
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "EMPTY").Return(coupon, nil)
+
+		err := service.ClaimCoupon("user123", "EMPTY")
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrNoStock))
+		mockCouponRepo.AssertExpectations(t)
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("user already claimed", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "CLAIMED",
+			Amount:         10,
+			RemainingAmount: 10,
+		}
+
+		// Mock transaction begin and rollback
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "CLAIMED").Return(coupon, nil)
+		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "CLAIMED").Return(database.ErrAlreadyClaimed)
+
+		err := service.ClaimCoupon("user123", "CLAIMED")
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrAlreadyClaimed))
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("database error during stock decrement", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "ERROR",
+			Amount:         10,
+			RemainingAmount: 10,
+		}
+
+		// Mock transaction begin and rollback
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "ERROR").Return(coupon, nil)
+		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "ERROR").Return(nil)
+		mockCouponRepo.On("DecrementStock", mock.AnythingOfType("*sql.Tx"), "ERROR").Return(repository.ErrNoStockAvailable)
+
+		err := service.ClaimCoupon("user123", "ERROR")
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrNoStock))
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
 }
 
-func TestGetCouponDetails_NotFound(t *testing.T) {
-	mockCouponRepo := &mockCouponRepository{
-		getByNameFunc: func(name string) (*repository.Coupon, error) {
-			return nil, repository.ErrCouponNotFound
-		},
-	}
+func TestCouponService_GetCouponDetails(t *testing.T) {
+	mockCouponRepo := new(MockCouponRepository)
+	mockClaimRepo := new(MockClaimRepository)
 	
-	service := NewCouponService(nil, mockCouponRepo, nil)
-	
-	_, err := service.GetCouponDetails("NOTFOUND")
-	if !errors.Is(err, ErrCouponNotFound) {
-		t.Errorf("Expected ErrCouponNotFound, got %v", err)
+	// Create a mock database connection
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock database: %v", err)
 	}
+	defer db.Close()
+
+	service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
+	t.Run("successful retrieval", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "TEST10",
+			Amount:         10,
+			RemainingAmount: 7,
+		}
+
+		mockCouponRepo.On("GetByName", "TEST10").Return(coupon, nil)
+
+		details, err := service.GetCouponDetails("TEST10")
+
+		assert.NoError(t, err)
+		assert.Equal(t, &CouponDetails{
+			ID:             1,
+			Name:           "TEST10",
+			Amount:         10,
+			RemainingAmount: 7,
+		}, details)
+		mockCouponRepo.AssertExpectations(t)
+	})
+
+	t.Run("coupon not found", func(t *testing.T) {
+		mockCouponRepo.On("GetByName", "NOTFOUND").Return(nil, repository.ErrCouponNotFound)
+
+		details, err := service.GetCouponDetails("NOTFOUND")
+
+		assert.Error(t, err)
+		assert.Nil(t, details)
+		assert.True(t, errors.Is(err, ErrCouponNotFound))
+		mockCouponRepo.AssertExpectations(t)
+	})
 }
-
-// Note: Testing ClaimCoupon with real transactions requires integration tests
-// These unit tests verify the error mapping logic
-
-func TestClaimCoupon_ErrorMapping_CouponNotFound(t *testing.T) {
-	// This test verifies that repository errors are properly mapped to service errors
-	// Real transaction testing should be done in integration tests
-	
-	mockCouponRepo := &mockCouponRepository{
-		getByNameForUpdateFunc: func(tx *sql.Tx, name string) (*repository.Coupon, error) {
-			return nil, repository.ErrCouponNotFound
-		},
-	}
-	
-	// Note: We can't fully test ClaimCoupon in unit tests because it requires a real DB transaction
-	// This would need to be tested in integration tests with a test database
-	service := NewCouponService(nil, mockCouponRepo, nil)
-	
-	// We can verify the service is created correctly
-	if service == nil {
-		t.Error("Expected service to be created")
-	}
-}
-
-func TestClaimCoupon_ErrorMapping_AlreadyClaimed(t *testing.T) {
-	// This test documents the expected error mapping behavior
-	// Real testing requires integration tests with a test database
-	
-	mockClaimRepo := &mockClaimRepository{
-		insertFunc: func(tx *sql.Tx, userID, couponName string) error {
-			return database.ErrAlreadyClaimed
-		},
-	}
-	
-	service := NewCouponService(nil, nil, mockClaimRepo)
-	
-	// Verify service creation
-	if service == nil {
-		t.Error("Expected service to be created")
-	}
-}
-
-// Integration test placeholder - requires real database
-// func TestClaimCoupon_Integration_Success(t *testing.T) {
-//     // This should be in an integration test file with a real test database
-//     // 1. Setup test database
-//     // 2. Create coupon with stock
-//     // 3. Claim coupon
-//     // 4. Verify claim was recorded
-//     // 5. Verify stock was decremented
-//     // 6. Verify transaction was atomic
-// }
-
-// Integration test placeholder - requires real database
-// func TestClaimCoupon_Integration_NoStock(t *testing.T) {
-//     // Test claiming when stock is 0
-// }
-
-// Integration test placeholder - requires real database
-// func TestClaimCoupon_Integration_AlreadyClaimed(t *testing.T) {
-//     // Test claiming same coupon twice with same user
-// }
-
-// Integration test placeholder - requires real database
-// func TestClaimCoupon_Integration_Concurrency(t *testing.T) {
-//     // Test multiple goroutines claiming same coupon simultaneously
-//     // Verify SELECT FOR UPDATE prevents race conditions
-// }
