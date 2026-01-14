@@ -8,17 +8,7 @@ import (
 	"github.com/nulad/ubersnap-assessment/internal/repository"
 )
 
-// Custom error types for service layer
-var (
-	// ErrAlreadyClaimed is returned when a user tries to claim a coupon they've already claimed
-	ErrAlreadyClaimed = errors.New("user has already claimed this coupon")
-	
-	// ErrNoStock is returned when a coupon has no remaining stock
-	ErrNoStock = errors.New("coupon has no stock available")
-	
-	// ErrCouponNotFound is returned when a coupon is not found
-	ErrCouponNotFound = errors.New("coupon not found")
-)
+
 
 // CouponDetails represents the detailed information about a coupon
 type CouponDetails struct {
