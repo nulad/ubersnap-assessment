@@ -230,6 +230,60 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 		mockClaimRepo.AssertExpectations(t)
 		assert.NoError(t, sqlMock.ExpectationsWereMet())
 	})
+
+	t.Run("begin transaction error", func(t *testing.T) {
+		// Mock transaction begin error
+		sqlMock.ExpectBegin().WillReturnError(errors.New("connection error"))
+
+		err := service.ClaimCoupon("user123", "ANY")
+
+		assert.Error(t, err)
+		assert.Equal(t, "connection error", err.Error())
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("generic repository error during GetByNameForUpdate", func(t *testing.T) {
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "DBERR").Return(nil, errors.New("db error"))
+
+		err := service.ClaimCoupon("user123", "DBERR")
+
+		assert.Error(t, err)
+		assert.Equal(t, "db error", err.Error())
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+
+	t.Run("generic claim error during Insert", func(t *testing.T) {
+		coupon := &repository.Coupon{Name: "CLAIMERR", RemainingAmount: 10}
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectRollback()
+		
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "CLAIMERR").Return(coupon, nil)
+		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "CLAIMERR").Return(errors.New("insert error"))
+
+		err := service.ClaimCoupon("user123", "CLAIMERR")
+
+		assert.Error(t, err)
+		assert.Equal(t, "insert error", err.Error())
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+	
+	t.Run("commit transaction error", func(t *testing.T) {
+		coupon := &repository.Coupon{Name: "COMMITERR", RemainingAmount: 10}
+		sqlMock.ExpectBegin()
+		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "COMMITERR").Return(coupon, nil)
+		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "COMMITERR").Return(nil)
+		mockCouponRepo.On("DecrementStock", mock.AnythingOfType("*sql.Tx"), "COMMITERR").Return(nil)
+		sqlMock.ExpectCommit().WillReturnError(errors.New("commit failed"))
+
+		err := service.ClaimCoupon("user123", "COMMITERR")
+
+		assert.Error(t, err)
+		assert.Equal(t, "commit failed", err.Error())
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
 }
 
 func TestCouponService_GetCouponDetails(t *testing.T) {
@@ -285,6 +339,17 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		assert.True(t, errors.Is(err, ErrCouponNotFound))
 		mockCouponRepo.AssertExpectations(t)
 	})
+
+	t.Run("generic coupon repo error", func(t *testing.T) {
+		mockCouponRepo.On("GetByName", "DBERR").Return(nil, errors.New("db error"))
+
+		details, err := service.GetCouponDetails("DBERR")
+
+		assert.Error(t, err)
+		assert.Nil(t, details)
+		assert.Equal(t, "db error", err.Error())
+		mockCouponRepo.AssertExpectations(t)
+	})
 	
 	t.Run("coupon with no claims", func(t *testing.T) {
 		coupon := &repository.Coupon{
@@ -309,6 +374,20 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 			RemainingAmount: 100,
 			ClaimedBy:      []string{}, // Empty array
 		}, details)
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
+	})
+
+	t.Run("claim repo error", func(t *testing.T) {
+		coupon := &repository.Coupon{Name: "CLAIMERR"}
+		mockCouponRepo.On("GetByName", "CLAIMERR").Return(coupon, nil)
+		mockClaimRepo.On("GetByCouponName", "CLAIMERR").Return([]database.Claim{}, errors.New("claim db error"))
+
+		details, err := service.GetCouponDetails("CLAIMERR")
+
+		assert.Error(t, err)
+		assert.Nil(t, details)
+		assert.Equal(t, "claim db error", err.Error())
 		mockCouponRepo.AssertExpectations(t)
 		mockClaimRepo.AssertExpectations(t)
 	})
