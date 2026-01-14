@@ -252,8 +252,14 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 			Amount:         10,
 			RemainingAmount: 7,
 		}
+		
+		claims := []database.Claim{
+			{UserID: "user1", CouponName: "TEST10"},
+			{UserID: "user2", CouponName: "TEST10"},
+		}
 
 		mockCouponRepo.On("GetByName", "TEST10").Return(coupon, nil)
+		mockClaimRepo.On("GetByCouponName", "TEST10").Return(claims, nil)
 
 		details, err := service.GetCouponDetails("TEST10")
 
@@ -263,8 +269,10 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 			Name:           "TEST10",
 			Amount:         10,
 			RemainingAmount: 7,
+			ClaimedBy:      []string{"user1", "user2"},
 		}, details)
 		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
 	})
 
 	t.Run("coupon not found", func(t *testing.T) {
@@ -276,5 +284,32 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		assert.Nil(t, details)
 		assert.True(t, errors.Is(err, ErrCouponNotFound))
 		mockCouponRepo.AssertExpectations(t)
+	})
+	
+	t.Run("coupon with no claims", func(t *testing.T) {
+		coupon := &repository.Coupon{
+			ID:             2,
+			Name:           "NEW_PROMO",
+			Amount:         100,
+			RemainingAmount: 100,
+		}
+		
+		var claims []database.Claim // Empty claims
+
+		mockCouponRepo.On("GetByName", "NEW_PROMO").Return(coupon, nil)
+		mockClaimRepo.On("GetByCouponName", "NEW_PROMO").Return(claims, nil)
+
+		details, err := service.GetCouponDetails("NEW_PROMO")
+
+		assert.NoError(t, err)
+		assert.Equal(t, &CouponDetails{
+			ID:             2,
+			Name:           "NEW_PROMO",
+			Amount:         100,
+			RemainingAmount: 100,
+			ClaimedBy:      []string{}, // Empty array
+		}, details)
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
 	})
 }

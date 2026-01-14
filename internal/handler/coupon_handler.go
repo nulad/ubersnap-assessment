@@ -104,5 +104,24 @@ func (h *CouponHandler) ClaimCoupon(c *gin.Context) {
 
 // GetCoupon handles GET /api/coupons/:name
 func (h *CouponHandler) GetCoupon(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"message": "not implemented"})
+	// Extract name from URL path parameter
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Coupon name is required"})
+		return
+	}
+	
+	// Call service.GetCouponDetails
+	details, err := h.couponService.GetCouponDetails(name)
+	if err != nil {
+		if errors.Is(err, service.ErrCouponNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Coupon not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve coupon"})
+		return
+	}
+	
+	// Return JSON response with coupon data
+	c.JSON(http.StatusOK, details)
 }

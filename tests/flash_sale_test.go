@@ -150,3 +150,60 @@ func TestFlashSale(t *testing.T) {
 	assert.Equal(t, 0, coupon.RemainingAmount, "Expected remaining amount to be 0")
 	assert.Equal(t, 5, len(coupon.ClaimedBy), "Expected exactly 5 users in claimed_by list")
 }
+
+func TestDoubleDipConcurrency(t *testing.T) {
+	// This test verifies exactly 1 claim succeeds when same user makes 10 concurrent requests
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:8080", 500*time.Millisecond)
+	if err != nil {
+		t.Skipf("Skipping Double Dip concurrency test: API server not reachable on localhost:8080: %v", err)
+	}
+	_ = conn.Close()
+
+	// Setup: Create coupon with amount=100
+	createCoupon(t, "DOUBLE_DIP", 100)
+
+	// Execute: Spawn 10 goroutines, ALL using SAME user_id
+	var wg sync.WaitGroup
+	results := make(chan int, 10)
+	const userId = "double_dip_user"
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// All goroutines use the SAME user_id
+			resp := claimCoupon(userId, "DOUBLE_DIP")
+			results <- resp.StatusCode
+		}()
+	}
+
+	// Wait for all to complete
+	wg.Wait()
+	close(results)
+
+	// Collect and count results
+	successCount := 0
+	conflictCount := 0
+	otherErrors := 0
+	
+	for code := range results {
+		if code == 200 || code == 201 {
+			successCount++
+		} else if code == 409 {
+			conflictCount++
+		} else {
+			otherErrors++
+		}
+	}
+
+	// Assert: Exactly 1 success, 9 conflicts
+	assert.Equal(t, 1, successCount, "Expected exactly 1 successful claim")
+	assert.Equal(t, 9, conflictCount, "Expected exactly 9 claims to fail with 409 (already claimed)")
+	assert.Equal(t, 0, otherErrors, "Expected no other errors")
+
+	// Verify database state
+	coupon := getCoupon(t, "DOUBLE_DIP")
+	assert.Equal(t, 99, coupon.RemainingAmount, "Expected remaining amount to be 99 after 1 claim")
+	assert.Equal(t, 1, len(coupon.ClaimedBy), "Expected exactly 1 user in claimed_by list")
+	assert.Contains(t, coupon.ClaimedBy, userId, "Expected the double dip user to be in claimed_by list")
+}
