@@ -17,6 +17,11 @@ func setupTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Skipf("Skipping integration tests: %v", err)
 	}
+
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		t.Skipf("Skipping integration tests: %v", err)
+	}
 	
 	// Clean up before each test
 	_, err = db.Exec("DELETE FROM coupons")

@@ -9,16 +9,21 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nulad/ubersnap-assessment/internal/repository"
 	"github.com/nulad/ubersnap-assessment/internal/service"
 	"github.com/stretchr/testify/assert"
 )
 
 // mockCouponService is a mock implementation of CouponService for testing
 type mockCouponService struct {
+	createCouponFunc func(name string, amount int) error
 	claimCouponFunc func(userID, couponName string) error
 }
 
 func (m *mockCouponService) CreateCoupon(name string, amount int) error {
+	if m.createCouponFunc != nil {
+		return m.createCouponFunc(name, amount)
+	}
 	return nil
 }
 
@@ -31,6 +36,64 @@ func (m *mockCouponService) ClaimCoupon(userID, couponName string) error {
 
 func (m *mockCouponService) GetCouponDetails(name string) (*service.CouponDetails, error) {
 	return nil, nil
+}
+
+func TestCreateCoupon_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := &mockCouponService{
+		createCouponFunc: func(name string, amount int) error {
+			return nil
+		},
+	}
+	h := NewCouponHandler(mockService)
+
+	body, _ := json.Marshal(map[string]any{"name": "PROMO_SUPER", "amount": 100})
+	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.POST("/api/coupons", h.CreateCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+}
+
+func TestCreateCoupon_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := &mockCouponService{}
+	h := NewCouponHandler(mockService)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString("invalid json"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.POST("/api/coupons", h.CreateCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCreateCoupon_DuplicateName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := &mockCouponService{
+		createCouponFunc: func(name string, amount int) error {
+			return repository.ErrCouponExists
+		},
+	}
+	h := NewCouponHandler(mockService)
+
+	body, _ := json.Marshal(map[string]any{"name": "PROMO_SUPER", "amount": 100})
+	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.POST("/api/coupons", h.CreateCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestClaimCoupon_Success(t *testing.T) {
