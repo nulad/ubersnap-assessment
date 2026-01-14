@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestPlaceholder(t *testing.T) {
