@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/nulad/ubersnap-assessment/internal/dto"
+	"github.com/nulad/ubersnap-assessment/internal/repository"
 	"github.com/nulad/ubersnap-assessment/internal/service"
 )
 
@@ -23,7 +24,23 @@ func NewCouponHandler(couponService service.CouponService) *CouponHandler {
 
 // CreateCoupon handles POST /api/coupons
 func (h *CouponHandler) CreateCoupon(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"message": "not implemented"})
+	var req dto.CreateCouponRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	err := h.couponService.CreateCoupon(req.Name, req.Amount)
+	if err != nil {
+		if errors.Is(err, repository.ErrInvalidAmount) || errors.Is(err, repository.ErrCouponExists) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create coupon"})
+		return
+	}
+
+	c.Status(http.StatusCreated)
 }
 
 // ClaimCoupon handles POST /api/coupons/claim
