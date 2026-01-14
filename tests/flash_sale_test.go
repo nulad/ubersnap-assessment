@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"testing"
@@ -97,6 +98,13 @@ func getCoupon(t *testing.T, name string) Coupon {
 }
 
 func TestFlashSale(t *testing.T) {
+	// This is an integration test that requires the API server to be running.
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:8080", 500*time.Millisecond)
+	if err != nil {
+		t.Skipf("Skipping Flash Sale integration test: API server not reachable on localhost:8080: %v", err)
+	}
+	_ = conn.Close()
+
 	// Setup: Create coupon with 5 stock
 	createCoupon(t, "FLASH", 5)
 
