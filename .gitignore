@@ -2,3 +2,15 @@
 .worktrees/
 bin/
 tmp/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
