@@ -18,6 +18,7 @@ import (
 type mockCouponService struct {
 	createCouponFunc func(name string, amount int) error
 	claimCouponFunc func(userID, couponName string) error
+	getCouponDetailsFunc func(name string) (*service.CouponDetails, error)
 }
 
 func (m *mockCouponService) CreateCoupon(name string, amount int) error {
@@ -35,6 +36,9 @@ func (m *mockCouponService) ClaimCoupon(userID, couponName string) error {
 }
 
 func (m *mockCouponService) GetCouponDetails(name string) (*service.CouponDetails, error) {
+	if m.getCouponDetailsFunc != nil {
+		return m.getCouponDetailsFunc(name)
+	}
 	return nil, nil
 }
 
@@ -333,4 +337,77 @@ func TestClaimCoupon_InternalError(t *testing.T) {
 	var response map[string]string
 	json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, "Failed to claim coupon", response["error"])
+}
+
+func TestGetCoupon_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	expectedCoupon := &service.CouponDetails{
+		ID:              1,
+		Name:            "PROMO_SUPER",
+		Amount:          100,
+		RemainingAmount: 50,
+		ClaimedBy:       []string{"user1", "user2"},
+	}
+	
+	mockService := &mockCouponService{
+		getCouponDetailsFunc: func(name string) (*service.CouponDetails, error) {
+			if name == "PROMO_SUPER" {
+				return expectedCoupon, nil
+			}
+			return nil, service.ErrCouponNotFound
+		},
+	}
+	h := NewCouponHandler(mockService)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/coupons/PROMO_SUPER", nil)
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.GET("/api/coupons/:name", h.GetCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var response service.CouponDetails
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Equal(t, expectedCoupon.Name, response.Name)
+	assert.Equal(t, expectedCoupon.ClaimedBy, response.ClaimedBy)
+}
+
+func TestGetCoupon_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := &mockCouponService{
+		getCouponDetailsFunc: func(name string) (*service.CouponDetails, error) {
+			return nil, service.ErrCouponNotFound
+		},
+	}
+	h := NewCouponHandler(mockService)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/coupons/MISSING", nil)
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.GET("/api/coupons/:name", h.GetCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestGetCoupon_InternalError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := &mockCouponService{
+		getCouponDetailsFunc: func(name string) (*service.CouponDetails, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	h := NewCouponHandler(mockService)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/coupons/PROMO_SUPER", nil)
+	w := httptest.NewRecorder()
+
+	router := gin.Default()
+	router.GET("/api/coupons/:name", h.GetCoupon)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
