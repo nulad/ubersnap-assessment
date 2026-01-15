@@ -13,7 +13,7 @@ import (
 func InitDatabase() (*DB, error) {
 	// Load configuration from environment
 	config := LoadConfigFromEnv()
-	
+
 	// Create connection
 	db, err := NewConnection(config)
 	if err != nil {

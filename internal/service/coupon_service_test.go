@@ -62,7 +62,7 @@ func (m *MockClaimRepository) GetByCouponName(couponName string) ([]database.Cla
 func TestCouponService_CreateCoupon(t *testing.T) {
 	mockCouponRepo := new(MockCouponRepository)
 	mockClaimRepo := new(MockClaimRepository)
-	
+
 	// Create a mock database connection
 	db, _, err := sqlmock.New()
 	if err != nil {
@@ -109,7 +109,7 @@ func TestCouponService_CreateCoupon(t *testing.T) {
 func TestCouponService_ClaimCoupon(t *testing.T) {
 	mockCouponRepo := new(MockCouponRepository)
 	mockClaimRepo := new(MockClaimRepository)
-	
+
 	// Create a mock database connection
 	db, sqlMock, err := sqlmock.New()
 	if err != nil {
@@ -121,19 +121,19 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 
 	t.Run("successful claim", func(t *testing.T) {
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "TEST10",
-			Amount:         10,
+			ID:              1,
+			Name:            "TEST10",
+			Amount:          10,
 			RemainingAmount: 10,
 		}
 
 		// Mock transaction begin
 		sqlMock.ExpectBegin()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "TEST10").Return(coupon, nil)
 		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "TEST10").Return(nil)
 		mockCouponRepo.On("DecrementStock", mock.AnythingOfType("*sql.Tx"), "TEST10").Return(nil)
-		
+
 		// Mock transaction commit
 		sqlMock.ExpectCommit()
 
@@ -149,7 +149,7 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 		// Mock transaction begin and rollback
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "NOTFOUND").Return(nil, repository.ErrCouponNotFound)
 
 		err := service.ClaimCoupon("user123", "NOTFOUND")
@@ -162,16 +162,16 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 
 	t.Run("no stock available", func(t *testing.T) {
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "EMPTY",
-			Amount:         10,
+			ID:              1,
+			Name:            "EMPTY",
+			Amount:          10,
 			RemainingAmount: 0,
 		}
 
 		// Mock transaction begin and rollback
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "EMPTY").Return(coupon, nil)
 
 		err := service.ClaimCoupon("user123", "EMPTY")
@@ -184,16 +184,16 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 
 	t.Run("user already claimed", func(t *testing.T) {
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "CLAIMED",
-			Amount:         10,
+			ID:              1,
+			Name:            "CLAIMED",
+			Amount:          10,
 			RemainingAmount: 10,
 		}
 
 		// Mock transaction begin and rollback
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "CLAIMED").Return(coupon, nil)
 		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "CLAIMED").Return(database.ErrAlreadyClaimed)
 
@@ -208,16 +208,16 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 
 	t.Run("database error during stock decrement", func(t *testing.T) {
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "ERROR",
-			Amount:         10,
+			ID:              1,
+			Name:            "ERROR",
+			Amount:          10,
 			RemainingAmount: 10,
 		}
 
 		// Mock transaction begin and rollback
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "ERROR").Return(coupon, nil)
 		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "ERROR").Return(nil)
 		mockCouponRepo.On("DecrementStock", mock.AnythingOfType("*sql.Tx"), "ERROR").Return(repository.ErrNoStockAvailable)
@@ -245,7 +245,7 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 	t.Run("generic repository error during GetByNameForUpdate", func(t *testing.T) {
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "DBERR").Return(nil, errors.New("db error"))
 
 		err := service.ClaimCoupon("user123", "DBERR")
@@ -259,7 +259,7 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 		coupon := &repository.Coupon{Name: "CLAIMERR", RemainingAmount: 10}
 		sqlMock.ExpectBegin()
 		sqlMock.ExpectRollback()
-		
+
 		mockCouponRepo.On("GetByNameForUpdate", mock.AnythingOfType("*sql.Tx"), "CLAIMERR").Return(coupon, nil)
 		mockClaimRepo.On("Insert", mock.AnythingOfType("*sql.Tx"), "user123", "CLAIMERR").Return(errors.New("insert error"))
 
@@ -269,7 +269,7 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 		assert.Equal(t, "insert error", err.Error())
 		assert.NoError(t, sqlMock.ExpectationsWereMet())
 	})
-	
+
 	t.Run("commit transaction error", func(t *testing.T) {
 		coupon := &repository.Coupon{Name: "COMMITERR", RemainingAmount: 10}
 		sqlMock.ExpectBegin()
@@ -298,12 +298,12 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
 
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "TEST10",
-			Amount:         10,
+			ID:              1,
+			Name:            "TEST10",
+			Amount:          10,
 			RemainingAmount: 7,
 		}
-		
+
 		claims := []database.Claim{
 			{UserID: "user1", CouponName: "TEST10"},
 			{UserID: "user2", CouponName: "TEST10"},
@@ -337,12 +337,12 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
 
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "EMPTY",
-			Amount:         10,
+			ID:              1,
+			Name:            "EMPTY",
+			Amount:          10,
 			RemainingAmount: 10,
 		}
-		
+
 		claims := []database.Claim{}
 
 		mockCouponRepo.On("GetByName", "EMPTY").Return(coupon, nil)
@@ -401,7 +401,7 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		assert.Equal(t, "db error", err.Error())
 		mockCouponRepo.AssertExpectations(t)
 	})
-	
+
 	t.Run("claim repo error", func(t *testing.T) {
 		mockCouponRepo := new(MockCouponRepository)
 		mockClaimRepo := new(MockClaimRepository)
@@ -413,9 +413,9 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
 
 		coupon := &repository.Coupon{
-			ID:             1,
-			Name:           "TEST10",
-			Amount:         10,
+			ID:              1,
+			Name:            "TEST10",
+			Amount:          10,
 			RemainingAmount: 7,
 		}
 

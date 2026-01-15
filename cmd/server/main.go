@@ -26,7 +26,7 @@ func main() {
 	log.Printf("Database connection pool stats: %+v", stats)
 
 	log.Println("Server started successfully")
-	
+
 	// Keep the server running
 	select {}
 }

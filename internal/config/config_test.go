@@ -7,7 +7,7 @@ import (
 
 func TestLoad_Defaults(t *testing.T) {
 	// Clear env vars to ensure we test defaults
-	// Note: This changes process env, which might affect other tests if run in parallel. 
+	// Note: This changes process env, which might affect other tests if run in parallel.
 	// Ideally we should restore them.
 	keys := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "SERVER_PORT"}
 	originalEnv := make(map[string]string)

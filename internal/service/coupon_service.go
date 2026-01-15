@@ -8,8 +8,6 @@ import (
 	"github.com/nulad/ubersnap-assessment/internal/repository"
 )
 
-
-
 // CouponDetails represents the detailed information about a coupon
 type CouponDetails struct {
 	ID              int      `json:"id"`
@@ -47,7 +45,7 @@ func (s *couponService) CreateCoupon(name string, amount int) error {
 	if amount <= 0 {
 		return repository.ErrInvalidAmount
 	}
-	
+
 	return s.couponRepo.Create(name, amount)
 }
 
@@ -59,7 +57,7 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Track whether we need to rollback
 	shouldRollback := true
 	defer func() {
@@ -67,7 +65,7 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 			tx.Rollback()
 		}
 	}()
-	
+
 	// 1. Lock coupon with SELECT FOR UPDATE
 	coupon, err := s.couponRepo.GetByNameForUpdate(tx, couponName)
 	if err != nil {
@@ -76,12 +74,12 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 		}
 		return err
 	}
-	
+
 	// 2. Check stock availability
 	if coupon.RemainingAmount <= 0 {
 		return ErrNoStock
 	}
-	
+
 	// 3. Insert claim record
 	err = s.claimRepo.Insert(tx, userID, couponName)
 	if err != nil {
@@ -90,7 +88,7 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 		}
 		return err
 	}
-	
+
 	// 4. Decrement stock
 	err = s.couponRepo.DecrementStock(tx, couponName)
 	if err != nil {
@@ -99,7 +97,7 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 		}
 		return err
 	}
-	
+
 	// 5. Commit transaction if all steps succeeded
 	// Mark as successful before commit to avoid rollback on commit failure
 	shouldRollback = false
@@ -107,7 +105,7 @@ func (s *couponService) ClaimCoupon(userID, couponName string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -120,19 +118,19 @@ func (s *couponService) GetCouponDetails(name string) (*CouponDetails, error) {
 		}
 		return nil, err
 	}
-	
+
 	// Fetch claims for this coupon
 	claims, err := s.claimRepo.GetByCouponName(name)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Extract user IDs from claims
 	claimedBy := make([]string, len(claims))
 	for i, claim := range claims {
 		claimedBy[i] = claim.UserID
 	}
-	
+
 	return &CouponDetails{
 		ID:              coupon.ID,
 		Name:            coupon.Name,

@@ -110,7 +110,7 @@ func (h *CouponHandler) GetCoupon(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Coupon name is required"})
 		return
 	}
-	
+
 	// Call service.GetCouponDetails
 	details, err := h.couponService.GetCouponDetails(name)
 	if err != nil {
@@ -121,7 +121,7 @@ func (h *CouponHandler) GetCoupon(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve coupon"})
 		return
 	}
-	
+
 	// Return JSON response with coupon data
 	c.JSON(http.StatusOK, details)
 }
