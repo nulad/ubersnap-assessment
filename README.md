@@ -86,6 +86,20 @@ Expected response: `200 OK` with JSON:
 }
 ```
 
+### Quick API Demo Script
+
+Run the included test script to see all endpoints in action:
+```bash
+./scripts/test-api.sh
+```
+
+This script will:
+1. Create a new coupon with 10 units
+2. Claim it with user1 (should succeed)
+3. Try to claim again with user1 (should fail with 409 Conflict)
+4. Claim with user2 (should succeed)
+5. Display the final coupon state showing 8 remaining units
+
 ### Automated Tests
 
 Run the full test suite with Docker Compose:
