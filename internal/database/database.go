@@ -25,18 +25,18 @@ func NewConnection(config *Config) (*DB, error) {
 	// Retry logic for initial connection
 	var err error
 	var sqlDB *sql.DB
-	
+
 	maxRetries := 10
 	backoff := time.Second
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		sqlDB, err = sql.Open("postgres", config.ConnectionString())
 		if err != nil {
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("failed to open database after %d attempts: %w", maxRetries, err)
 			}
-			
-			log.Printf("Attempt %d/%d: failed to open database, retrying in %v... Error: %v", 
+
+			log.Printf("Attempt %d/%d: failed to open database, retrying in %v... Error: %v",
 				attempt, maxRetries, backoff, err)
 			time.Sleep(backoff)
 			backoff *= 2
@@ -49,8 +49,8 @@ func NewConnection(config *Config) (*DB, error) {
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("failed to ping database after %d attempts: %w", maxRetries, err)
 			}
-			
-			log.Printf("Attempt %d/%d: failed to ping database, retrying in %v... Error: %v", 
+
+			log.Printf("Attempt %d/%d: failed to ping database, retrying in %v... Error: %v",
 				attempt, maxRetries, backoff, err)
 			sqlDB.Close()
 			time.Sleep(backoff)
@@ -70,7 +70,7 @@ func NewConnection(config *Config) (*DB, error) {
 	db.DB.SetConnMaxLifetime(config.ConnMaxLifetime)
 
 	log.Printf("Database connection established successfully")
-	log.Printf("Connection pool: MaxOpen=%d, MaxIdle=%d, MaxLifetime=%v", 
+	log.Printf("Connection pool: MaxOpen=%d, MaxIdle=%d, MaxLifetime=%v",
 		config.MaxOpenConns, config.MaxIdleConns, config.ConnMaxLifetime)
 
 	return db, nil

@@ -26,7 +26,7 @@ func createCoupon(t *testing.T, name string, amount int) {
 	// Add retry logic for server startup
 	var resp *http.Response
 	var err error
-	
+
 	for i := 0; i < 10; i++ {
 		payload := map[string]interface{}{
 			"name":   name,
@@ -46,7 +46,7 @@ func createCoupon(t *testing.T, name string, amount int) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		// If 409, maybe it already exists from a previous run? 
+		// If 409, maybe it already exists from a previous run?
 		// But we should probably fail if we expect a clean state.
 		// Detailed error reading
 		t.Fatalf("Failed to create coupon. Expected 201 Created, got %d", resp.StatusCode)
@@ -59,12 +59,12 @@ func claimCoupon(userId, couponName string) *http.Response {
 		"coupon_name": couponName,
 	}
 	body, _ := json.Marshal(payload)
-	
+
 	// Use a client with timeout
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	
+
 	resp, err := client.Post(baseURL+"/coupons/claim", "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		// Return 500 response on connection error to satisfy test signature
@@ -85,11 +85,11 @@ func getCoupon(t *testing.T, name string) Coupon {
 		t.Fatalf("Failed to get coupon: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", resp.StatusCode)
 	}
-	
+
 	var coupon Coupon
 	if err := json.NewDecoder(resp.Body).Decode(&coupon); err != nil {
 		t.Fatalf("Failed to decode coupon: %v", err)
@@ -187,7 +187,7 @@ func TestDoubleDipConcurrency(t *testing.T) {
 	successCount := 0
 	conflictCount := 0
 	otherErrors := 0
-	
+
 	for code := range results {
 		if code == 200 || code == 201 {
 			successCount++

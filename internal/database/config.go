@@ -9,31 +9,31 @@ import (
 
 // Config holds the database configuration
 type Config struct {
-	Host         string
-	Port         int
-	User         string
-	Password     string
-	DBName       string
-	SSLMode      string
-	MaxOpenConns int
-	MaxIdleConns int
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	DBName          string
+	SSLMode         string
+	MaxOpenConns    int
+	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
 }
 
 // LoadConfigFromEnv loads database configuration from environment variables
 func LoadConfigFromEnv() *Config {
 	cfg := &Config{
-		Host:             getEnvOrDefault("DB_HOST", "localhost"),
-		Port:             getEnvIntOrDefault("DB_PORT", 5432),
-		User:             getEnvOrDefault("DB_USER", "postgres"),
-		Password:         getEnvOrDefault("DB_PASSWORD", ""),
-		DBName:           getEnvOrDefault("DB_NAME", "ubersnap"),
-		SSLMode:          getEnvOrDefault("DB_SSLMODE", "disable"),
-		MaxOpenConns:     getEnvIntOrDefault("DB_MAX_OPEN_CONNS", 25),
-		MaxIdleConns:     getEnvIntOrDefault("DB_MAX_IDLE_CONNS", 10),
-		ConnMaxLifetime:  getEnvDurationOrDefault("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+		Host:            getEnvOrDefault("DB_HOST", "localhost"),
+		Port:            getEnvIntOrDefault("DB_PORT", 5432),
+		User:            getEnvOrDefault("DB_USER", "postgres"),
+		Password:        getEnvOrDefault("DB_PASSWORD", ""),
+		DBName:          getEnvOrDefault("DB_NAME", "ubersnap"),
+		SSLMode:         getEnvOrDefault("DB_SSLMODE", "disable"),
+		MaxOpenConns:    getEnvIntOrDefault("DB_MAX_OPEN_CONNS", 25),
+		MaxIdleConns:    getEnvIntOrDefault("DB_MAX_IDLE_CONNS", 10),
+		ConnMaxLifetime: getEnvDurationOrDefault("DB_CONN_MAX_LIFETIME", 5*time.Minute),
 	}
-	
+
 	return cfg
 }
 

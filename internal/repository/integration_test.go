@@ -18,7 +18,7 @@ func TestCouponRepository_Integration(t *testing.T) {
 		t.Skipf("Skipping integration test: %v", err)
 	}
 	defer db.Close()
-	
+
 	// Create the coupons table for SQLite
 	_, err = db.Exec(`
 		CREATE TABLE coupons (
@@ -31,24 +31,24 @@ func TestCouponRepository_Integration(t *testing.T) {
 		)
 	`)
 	require.NoError(t, err)
-	
+
 	repo := NewCouponRepository(db)
-	
+
 	// Test Create
 	err = repo.Create("TEST20", 20)
 	assert.NoError(t, err)
-	
+
 	// Test GetByName
 	coupon, err := repo.GetByName("TEST20")
 	assert.NoError(t, err)
 	assert.Equal(t, "TEST20", coupon.Name)
 	assert.Equal(t, 20, coupon.Amount)
 	assert.Equal(t, 20, coupon.RemainingAmount)
-	
+
 	// Test GetByNameForUpdate (SQLite doesn't support FOR UPDATE, so we'll test the basic functionality)
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	
+
 	// In SQLite, FOR UPDATE is not supported, so we'll just test that the method works
 	// The actual locking behavior would be tested in PostgreSQL
 	coupon, err = repo.GetByNameForUpdate(tx, "TEST20")
@@ -60,28 +60,28 @@ func TestCouponRepository_Integration(t *testing.T) {
 	} else {
 		assert.NoError(t, err)
 		assert.Equal(t, "TEST20", coupon.Name)
-		
+
 		// Test DecrementStock
 		err = repo.DecrementStock(tx, "TEST20")
 		assert.NoError(t, err)
-		
+
 		// Verify stock was decremented
 		coupon, err = repo.GetByNameForUpdate(tx, "TEST20")
 		assert.NoError(t, err)
 		assert.Equal(t, 19, coupon.RemainingAmount)
-		
+
 		tx.Commit()
 	}
-	
+
 	// Test error cases
 	_, err = repo.GetByName("NOTFOUND")
 	assert.Equal(t, ErrCouponNotFound, err)
-	
+
 	// Test duplicate creation
 	err = repo.Create("TEST20", 10)
 	assert.Error(t, err)
 	assert.Equal(t, ErrCouponExists, err)
-	
+
 	// Test negative amount
 	err = repo.Create("NEGATIVE", -1)
 	assert.Error(t, err)
@@ -100,7 +100,7 @@ func BenchmarkCouponRepository_Create(b *testing.B) {
 		b.Skipf("Skipping benchmark: %v", err)
 	}
 	defer db.Close()
-	
+
 	_, err = db.Exec(`
 		CREATE TABLE coupons (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,9 +114,9 @@ func BenchmarkCouponRepository_Create(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	repo := NewCouponRepository(db)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		err := repo.Create("BENCH"+string(rune(i)), 100)
@@ -132,7 +132,7 @@ func BenchmarkCouponRepository_GetByName(b *testing.B) {
 		b.Skipf("Skipping benchmark: %v", err)
 	}
 	defer db.Close()
-	
+
 	_, err = db.Exec(`
 		CREATE TABLE coupons (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,13 +146,13 @@ func BenchmarkCouponRepository_GetByName(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	repo := NewCouponRepository(db)
 	err = repo.Create("BENCHMARK", 100)
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := repo.GetByName("BENCHMARK")
