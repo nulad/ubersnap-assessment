@@ -34,6 +34,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/main .
 
+# Copy database schema files
+COPY --from=builder /app/database ./database
+
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 

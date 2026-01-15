@@ -6,7 +6,7 @@
 
 -- Coupons table
 -- Stores coupon information with amount tracking
-CREATE TABLE coupons (
+CREATE TABLE IF NOT EXISTS coupons (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     amount INTEGER NOT NULL CHECK (amount >= 0),
@@ -17,7 +17,7 @@ CREATE TABLE coupons (
 
 -- Claims table
 -- Tracks user claims with unique constraint to prevent duplicates
-CREATE TABLE claims (
+CREATE TABLE IF NOT EXISTS claims (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     coupon_name VARCHAR(255) NOT NULL,
@@ -35,16 +35,16 @@ CREATE TABLE claims (
 
 -- Indexes for performance
 -- Index on coupons.name for faster lookups
-CREATE INDEX idx_coupons_name ON coupons(name);
+CREATE INDEX IF NOT EXISTS idx_coupons_name ON coupons(name);
 
 -- Index on claims.user_id for user-specific queries
-CREATE INDEX idx_claims_user_id ON claims(user_id);
+CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
 
 -- Index on claims.coupon_name for coupon-specific queries
-CREATE INDEX idx_claims_coupon_name ON claims(coupon_name);
+CREATE INDEX IF NOT EXISTS idx_claims_coupon_name ON claims(coupon_name);
 
 -- Composite index for common query patterns (user_id, claimed_at)
-CREATE INDEX idx_claims_user_claimed_at ON claims(user_id, claimed_at);
+CREATE INDEX IF NOT EXISTS idx_claims_user_claimed_at ON claims(user_id, claimed_at);
 
 -- Trigger to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -55,14 +55,22 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_coupons_updated_at 
-    BEFORE UPDATE ON coupons 
-    FOR EACH ROW 
+DROP TRIGGER IF EXISTS update_coupons_updated_at ON coupons;
+CREATE TRIGGER update_coupons_updated_at
+    BEFORE UPDATE ON coupons
+    FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Add check to ensure remaining_amount never exceeds amount
-ALTER TABLE coupons ADD CONSTRAINT check_remaining_not_exceed_amount 
-    CHECK (remaining_amount <= amount);
+-- Add check to ensure remaining_amount never exceeds amount (only if not exists)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'check_remaining_not_exceed_amount'
+    ) THEN
+        ALTER TABLE coupons ADD CONSTRAINT check_remaining_not_exceed_amount
+            CHECK (remaining_amount <= amount);
+    END IF;
+END $$;
 
 -- Comments for documentation
 COMMENT ON TABLE coupons IS 'Stores coupon information with amount tracking';

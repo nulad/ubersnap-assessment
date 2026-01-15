@@ -26,11 +26,8 @@ func main() {
 
 	log.Println("Starting server...")
 
-	// 2. Initialize database connection
-	// We use the database package's config loader for DB specifics
-	dbConfig := database.LoadConfigFromEnv()
-	
-	db, err := database.NewConnection(dbConfig)
+	// 2. Initialize database connection and run migrations
+	db, err := database.InitDatabase()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
