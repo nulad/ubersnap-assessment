@@ -1,6 +1,6 @@
 module github.com/nulad/ubersnap-assessment
 
-go 1.18
+go 1.21
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2

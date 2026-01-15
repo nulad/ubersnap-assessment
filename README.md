@@ -17,14 +17,16 @@ Before running this application, ensure you have the following installed:
 
 - **Docker Desktop**: Version 20.10 or higher
 - **Docker Compose**: Version 2.0 or higher (included with Docker Desktop)
+- **Go**: Version 1.18 or higher (required for running automated tests)
 - **Available Ports**:
   - Port 8080 for the API server
   - Port 5432 for PostgreSQL database
 
-You can verify Docker installation with:
+You can verify installations with:
 ```bash
 docker --version
 docker-compose --version
+go version
 ```
 
 ## How to Run
@@ -53,6 +55,25 @@ docker-compose down
 ```
 
 ## How to Test
+
+### Automated Test Suite (Recommended)
+
+For evaluators and automated testing, use the automated test runner:
+
+```bash
+./scripts/run-tests.sh
+```
+
+This script will:
+1. Clean up any existing containers
+2. Start all services with `docker-compose up -d --build`
+3. Wait for services to be healthy
+4. Run the full integration test suite (Flash Sale & Double Dip tests)
+5. Report results
+
+**Prerequisites**: Go 1.18+ must be installed on the host machine to run integration tests.
+
+**Note**: Services will remain running after tests complete. Use `docker-compose down` to stop them.
 
 ### Manual Testing with curl
 
@@ -100,12 +121,14 @@ This script will:
 4. Claim with user2 (should succeed)
 5. Display the final coupon state showing 8 remaining units
 
-### Automated Tests
+### Running Tests Manually
 
-Run the full test suite with Docker Compose:
+If services are already running, you can run tests directly:
 ```bash
 docker-compose exec api go test ./tests/... -v
 ```
+
+**Prerequisites**: Ensure services are running first with `docker-compose up -d`
 
 #### Expected Test Results
 
@@ -360,4 +383,34 @@ This layered architecture ensures:
 
 ---
 
-**Built with Go 1.23, PostgreSQL 15, Docker, and Gin Web Framework**
+## Submission Checklist
+
+Before submitting this assessment, ensure you have completed the following:
+
+### Repository
+- [ ] Repository is **public** on GitHub (or access granted if private)
+- [ ] All code is pushed to the repository
+- [ ] README.md is complete and accurate
+
+### Testing
+- [ ] Automated tests pass: `./scripts/run-tests.sh`
+- [ ] Manual API test works: `./scripts/test-api.sh`
+- [ ] Clean build succeeds: `docker-compose up --build`
+- [ ] Both evaluation scenarios pass:
+  - Flash Sale Test (50 concurrent → 5 success)
+  - Double Dip Test (10 concurrent same user → 1 success, 9 conflicts)
+
+### Email Submission
+Send your submission email with:
+
+- **To**: `rofie@ubersnap.com`
+- **Cc**: `boonchin@ubersnap.com`
+- **Subject**: Backend Engineer Test - [Your Name]
+- **Body**:
+  - Link to your GitHub Repository
+  - Any specific notes or highlights
+- **Attachment**: Latest CV/Resume (PDF format)
+
+---
+
+**Built with Go 1.21, PostgreSQL 15, Docker, and Gin Web Framework**
