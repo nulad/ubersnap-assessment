@@ -12,11 +12,11 @@ import (
 
 // CouponDetails represents the detailed information about a coupon
 type CouponDetails struct {
-	ID             int      `json:"id"`
-	Name           string   `json:"name"`
-	Amount         int      `json:"amount"`
-	RemainingAmount int     `json:"remaining_amount"`
-	ClaimedBy      []string `json:"claimed_by"`
+	ID              int      `json:"id"`
+	Name            string   `json:"name"`
+	Amount          int      `json:"amount"`
+	RemainingAmount int      `json:"remaining_amount"`
+	ClaimedBy       []string `json:"claimed_by"`
 }
 
 // CouponService defines the interface for coupon business logic
@@ -134,10 +134,10 @@ func (s *couponService) GetCouponDetails(name string) (*CouponDetails, error) {
 	}
 	
 	return &CouponDetails{
-		ID:             coupon.ID,
-		Name:           coupon.Name,
-		Amount:         coupon.Amount,
+		ID:              coupon.ID,
+		Name:            coupon.Name,
+		Amount:          coupon.Amount,
 		RemainingAmount: coupon.RemainingAmount,
-		ClaimedBy:      claimedBy,
+		ClaimedBy:       claimedBy,
 	}, nil
 }

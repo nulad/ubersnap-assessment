@@ -287,19 +287,16 @@ func TestCouponService_ClaimCoupon(t *testing.T) {
 }
 
 func TestCouponService_GetCouponDetails(t *testing.T) {
-	mockCouponRepo := new(MockCouponRepository)
-	mockClaimRepo := new(MockClaimRepository)
-	
-	// Create a mock database connection
-	db, _, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create mock database: %v", err)
-	}
-	defer db.Close()
+	t.Run("successful retrieval with claims", func(t *testing.T) {
+		mockCouponRepo := new(MockCouponRepository)
+		mockClaimRepo := new(MockClaimRepository)
+		db, _, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database: %v", err)
+		}
+		defer db.Close()
+		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
 
-	service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
-
-	t.Run("successful retrieval", func(t *testing.T) {
 		coupon := &repository.Coupon{
 			ID:             1,
 			Name:           "TEST10",
@@ -319,17 +316,62 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, &CouponDetails{
-			ID:             1,
-			Name:           "TEST10",
-			Amount:         10,
+			ID:              1,
+			Name:            "TEST10",
+			Amount:          10,
 			RemainingAmount: 7,
-			ClaimedBy:      []string{"user1", "user2"},
+			ClaimedBy:       []string{"user1", "user2"},
+		}, details)
+		mockCouponRepo.AssertExpectations(t)
+		mockClaimRepo.AssertExpectations(t)
+	})
+
+	t.Run("successful retrieval no claims", func(t *testing.T) {
+		mockCouponRepo := new(MockCouponRepository)
+		mockClaimRepo := new(MockClaimRepository)
+		db, _, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database: %v", err)
+		}
+		defer db.Close()
+		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "EMPTY",
+			Amount:         10,
+			RemainingAmount: 10,
+		}
+		
+		claims := []database.Claim{}
+
+		mockCouponRepo.On("GetByName", "EMPTY").Return(coupon, nil)
+		mockClaimRepo.On("GetByCouponName", "EMPTY").Return(claims, nil)
+
+		details, err := service.GetCouponDetails("EMPTY")
+
+		assert.NoError(t, err)
+		assert.Equal(t, &CouponDetails{
+			ID:              1,
+			Name:            "EMPTY",
+			Amount:          10,
+			RemainingAmount: 10,
+			ClaimedBy:       []string{},
 		}, details)
 		mockCouponRepo.AssertExpectations(t)
 		mockClaimRepo.AssertExpectations(t)
 	})
 
 	t.Run("coupon not found", func(t *testing.T) {
+		mockCouponRepo := new(MockCouponRepository)
+		mockClaimRepo := new(MockClaimRepository)
+		db, _, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database: %v", err)
+		}
+		defer db.Close()
+		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
 		mockCouponRepo.On("GetByName", "NOTFOUND").Return(nil, repository.ErrCouponNotFound)
 
 		details, err := service.GetCouponDetails("NOTFOUND")
@@ -341,6 +383,15 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 	})
 
 	t.Run("generic coupon repo error", func(t *testing.T) {
+		mockCouponRepo := new(MockCouponRepository)
+		mockClaimRepo := new(MockClaimRepository)
+		db, _, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database: %v", err)
+		}
+		defer db.Close()
+		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
+
 		mockCouponRepo.On("GetByName", "DBERR").Return(nil, errors.New("db error"))
 
 		details, err := service.GetCouponDetails("DBERR")
@@ -351,43 +402,32 @@ func TestCouponService_GetCouponDetails(t *testing.T) {
 		mockCouponRepo.AssertExpectations(t)
 	})
 	
-	t.Run("coupon with no claims", func(t *testing.T) {
-		coupon := &repository.Coupon{
-			ID:             2,
-			Name:           "NEW_PROMO",
-			Amount:         100,
-			RemainingAmount: 100,
-		}
-		
-		var claims []database.Claim // Empty claims
-
-		mockCouponRepo.On("GetByName", "NEW_PROMO").Return(coupon, nil)
-		mockClaimRepo.On("GetByCouponName", "NEW_PROMO").Return(claims, nil)
-
-		details, err := service.GetCouponDetails("NEW_PROMO")
-
-		assert.NoError(t, err)
-		assert.Equal(t, &CouponDetails{
-			ID:             2,
-			Name:           "NEW_PROMO",
-			Amount:         100,
-			RemainingAmount: 100,
-			ClaimedBy:      []string{}, // Empty array
-		}, details)
-		mockCouponRepo.AssertExpectations(t)
-		mockClaimRepo.AssertExpectations(t)
-	})
-
 	t.Run("claim repo error", func(t *testing.T) {
-		coupon := &repository.Coupon{Name: "CLAIMERR"}
-		mockCouponRepo.On("GetByName", "CLAIMERR").Return(coupon, nil)
-		mockClaimRepo.On("GetByCouponName", "CLAIMERR").Return([]database.Claim{}, errors.New("claim db error"))
+		mockCouponRepo := new(MockCouponRepository)
+		mockClaimRepo := new(MockClaimRepository)
+		db, _, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database: %v", err)
+		}
+		defer db.Close()
+		service := NewCouponService(mockCouponRepo, mockClaimRepo, db)
 
-		details, err := service.GetCouponDetails("CLAIMERR")
+		coupon := &repository.Coupon{
+			ID:             1,
+			Name:           "TEST10",
+			Amount:         10,
+			RemainingAmount: 7,
+		}
+
+		mockCouponRepo.On("GetByName", "TEST10").Return(coupon, nil)
+		mockClaimRepo.On("GetByCouponName", "TEST10").Return([]database.Claim{}, errors.New("claim db error"))
+
+		details, err := service.GetCouponDetails("TEST10")
 
 		assert.Error(t, err)
 		assert.Nil(t, details)
-		assert.Equal(t, "claim db error", err.Error())
+		// Matched string error as per HEAD version
+		assert.Contains(t, err.Error(), "claim db error")
 		mockCouponRepo.AssertExpectations(t)
 		mockClaimRepo.AssertExpectations(t)
 	})

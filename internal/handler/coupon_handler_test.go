@@ -16,8 +16,8 @@ import (
 
 // mockCouponService is a mock implementation of CouponService for testing
 type mockCouponService struct {
-	createCouponFunc    func(name string, amount int) error
-	claimCouponFunc     func(userID, couponName string) error
+	createCouponFunc     func(name string, amount int) error
+	claimCouponFunc      func(userID, couponName string) error
 	getCouponDetailsFunc func(name string) (*service.CouponDetails, error)
 }
 
