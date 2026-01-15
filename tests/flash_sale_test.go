@@ -105,8 +105,9 @@ func TestFlashSale(t *testing.T) {
 	}
 	_ = conn.Close()
 
-	// Setup: Create coupon with 5 stock
-	createCoupon(t, "FLASH", 5)
+	// Setup: Create coupon with 5 stock with unique name to avoid conflicts
+	couponName := fmt.Sprintf("FLASH_%d", time.Now().UnixNano())
+	createCoupon(t, couponName, 5)
 
 	// Execute: 50 concurrent goroutines
 	var wg sync.WaitGroup
@@ -120,7 +121,7 @@ func TestFlashSale(t *testing.T) {
 			// Each goroutine makes HTTP POST request
 			resp := claimCoupon(
 				fmt.Sprintf("user_%d", userNum),
-				"FLASH",
+				couponName,
 			)
 			results <- resp.StatusCode
 		}(i)
@@ -146,7 +147,7 @@ func TestFlashSale(t *testing.T) {
 	assert.Equal(t, 45, failCount, "Expected exactly 45 failed claims")
 
 	// Verify database state
-	coupon := getCoupon(t, "FLASH")
+	coupon := getCoupon(t, couponName)
 	assert.Equal(t, 0, coupon.RemainingAmount, "Expected remaining amount to be 0")
 	assert.Equal(t, 5, len(coupon.ClaimedBy), "Expected exactly 5 users in claimed_by list")
 }
